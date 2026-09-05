@@ -1,13 +1,14 @@
 import os
 from dotenv import load_dotenv
 import psycopg
+from psycopg.rows import dict_row
 
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db_connection():
-    """Establishes an active connection to the PostgreSQL container."""
-    return psycopg.connect(DATABASE_URL)
+    """Establishes an active connection to the PostgreSQL container with dict rows."""
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 def init_db():
     """Ensures the tasks table exists in PostgreSQL on application startup."""
@@ -23,8 +24,8 @@ def init_db():
         '''
             )
         
-            cursor.execute('SELECT COUNT(*) FROM tasks')
-            count = cursor.fetchone()[0]
+            cursor.execute('SELECT COUNT(*) as count FROM tasks')
+            count = cursor.fetchone()['count']
 
             if count == 0:
                 seed_tasks = [

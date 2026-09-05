@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from db import init_db
+from db import get_db_connection, init_db
 
 
 @asynccontextmanager
@@ -21,57 +21,54 @@ async def lifespan(app : FastAPI):
 app= FastAPI(lifespan=lifespan)
 
 # PYDANTIC MODELS
-# class TaskCreate(BaseModel):
-#     title: str
-#     done: Optional[bool] = False
+class TaskCreate(BaseModel):
+    title: str
+    done: Optional[bool] = False
 
-# @app.get('/')
-# def root():
-#     """Returns basic API metadata and the available endpoints. """
-#     return {
-#         'name': 'Task API', 
-#         'version' : '1.0' , 
-#         'endpoints' : ['/tasks'] 
-#         }
+@app.get('/')
+def root():
+    """Returns basic API metadata and the available endpoints. """
+    return {
+        'name': 'Task API', 
+        'version' : '1.0' , 
+        'endpoints' : ['/tasks'] 
+        }
 
-# @app.get('/health')
-# def healthcheck():
-#     """Checks API health status."""
-#     return {'status' : 'ok'}
+@app.get('/health')
+def healthcheck():
+    """Checks API health status."""
+    return {'status' : 'ok'}
 
-# # # Stage 1 endpoints
-# @app.get('/tasks')
-# def get_tasks():
-#     """Returns all tasks from the SQLite database."""
-#     cursor= conn.cursor()
-#     cursor.execute('SELECT * FROM tasks')
-#     tasks = cursor.fetchall()
-   
-#     tasks_list = []
-#     for task in tasks:
-#        tasks_list.append(
-#         {
-#            'id': task['id'],
-#            'title': task['title'],
-#            'done': bool(task['done'])
-#        })
-#     return tasks_list
+# Stage 2 Endpoints
+@app.get('/tasks')
+def get_tasks():
+    """Returns all tasks from the PostgreSQL database."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT * FROM tasks')
+            tasks = cursor.fetchall()
 
-# @app.get('/tasks/{task_id}')
-# def get_task(task_id:int):
-#     """Retrieves a single task by its unique ID from the SQLite database."""
-#     cursor = conn.cursor()
-#     cursor.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
-#     task = cursor.fetchone()
-#     if not task:
-#         return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
-#     return {
-#         'id': task['id'],
-#         'title': task['title'],
-#         'done': bool(task['done'])
-#     }
+    return tasks
 
-# # # Stage 2 endpoints
+
+@app.get('/tasks/{task_id}')
+def get_task(task_id:int):
+    """Retrieves a single task by its unique ID from the PostgreSQL database."""
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT * FROM tasks WHERE id = %s', (task_id,))
+            task = cursor.fetchone()
+    
+    if not task:
+        return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+    
+    return {
+        'id': task['id'],
+        'title': task['title'],
+        'done': bool(task['done'])
+    }
+
 # @app.post('/tasks', status_code=201)
 # def create_task(task: TaskCreate):
 #     """Creates a new task with a title in the SQLite database."""
@@ -94,7 +91,7 @@ app= FastAPI(lifespan=lifespan)
 #     title: Optional[str] = None
 #     done: Optional[bool] = None
 
-# # # Stage 3 endpoints
+
 # @app.put('/tasks/{task_id}')
 # def update_task(task_id:int, task: TaskUpdate):
 #     """Updates a task's title and/or completion status."""
