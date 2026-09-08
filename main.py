@@ -63,78 +63,66 @@ def get_task(task_id:int):
     if not task:
         return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
     
-    return {
-        'id': task['id'],
-        'title': task['title'],
-        'done': bool(task['done'])
-    }
+    return task
 
-# @app.post('/tasks', status_code=201)
-# def create_task(task: TaskCreate):
-#     """Creates a new task with a title in the SQLite database."""
-#     if not task.title or not task.title.strip():
-#         return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
+# Stage 3 Endpoints
+@app.post('/tasks', status_code=201)
+def create_task(task: TaskCreate):
+    """Creates a new task with a title in the PostgreSQL database."""
+    if not task.title or not task.title.strip():
+        return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
 
-#     cursor = conn.cursor()
-#     cursor.execute('INSERT INTO tasks (title, done) VALUES (?, ?)', (task.title.strip(), task.done))
-#     conn.commit()
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING *;', (task.title.strip(), task.done))
+            new_task = cursor.fetchone()
 
-#     new_task_id = cursor.lastrowid
+    return new_task
 
-#     return {
-#         'id': new_task_id,
-#         'title': task.title.strip(),
-#         'done': task.done
-#     }
-
-# class TaskUpdate(BaseModel):
-#     title: Optional[str] = None
-#     done: Optional[bool] = None
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
 
 
-# @app.put('/tasks/{task_id}')
-# def update_task(task_id:int, task: TaskUpdate):
-#     """Updates a task's title and/or completion status."""
-#     cursor = conn.cursor()
-#     cursor.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
-#     current_task = cursor.fetchone()
+@app.put('/tasks/{task_id}')
+def update_task(task_id:int, task: TaskUpdate):
+    """Updates a task's title and/or completion status."""
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT * FROM tasks WHERE id = %s', (task_id,))
+            current_task = cursor.fetchone()
         
-#     if not current_task:
-#         return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+            if not current_task:
+                return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
 
-#     if task.title is None and task.done is None:
-#         return JSONResponse(status_code=400, content={'error': 'At least one field (title or done) must be provided for update'})
+            if task.title is None and task.done is None:
+                return JSONResponse(status_code=400, content={'error': 'At least one field (title or done) must be provided for update'})
     
-#     if task.title is not None:
-#         if not task.title.strip():
-#             return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
-#         current_task['title'] = task.title.strip()
+            if task.title is not None:
+                if not task.title.strip():
+                    return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
+                current_task['title'] = task.title.strip()
 
-#     new_done = current_task['done']
-#     if task.done is not None:
-#         new_done = task.done
+            new_done = current_task['done'] if task.done is None else task.done
     
-#     cursor.execute('UPDATE tasks SET title = ?, done = ? WHERE id = ?', (current_task['title'], new_done, task_id))
-#     conn.commit()
+            cursor.execute('UPDATE tasks SET title = %s, done = %s WHERE id = %s RETURNING *', (current_task['title'], new_done, task_id))
+            updated_task = cursor.fetchone()
+    return updated_task
 
-#     return {
-#         'id': current_task['id'],
-#         'title': current_task['title'],
-#         'done': bool(current_task['done'])
-#     }
 
-# @app.delete('/tasks/{task_id}', status_code=204)
-# def delete_task(task_id:int):
-#     """Deletes a task by its unique ID from the SQLite database."""
+@app.delete('/tasks/{task_id}', status_code=204)
+def delete_task(task_id:int):
+    """Deletes a task by its unique ID from the PostgreSQL database."""
 
-#     cursor = conn.cursor()
-#     cursor.execute('SELECT id FROM tasks WHERE id = ?', (task_id,))
-#     task = cursor.fetchone()
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT id FROM tasks WHERE id = %s', (task_id,))
+            task = cursor.fetchone()
 
-#     if not task:
-#         return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+            if not task:
+                return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
 
-#     cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-#     conn.commit()
+            cursor.execute('DELETE FROM tasks WHERE id = %s', (task_id,))
     
-#     return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
