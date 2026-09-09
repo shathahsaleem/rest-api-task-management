@@ -1,6 +1,4 @@
-import os
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
 from fastapi import FastAPI, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -61,7 +59,7 @@ def get_task(task_id:int):
             task = cursor.fetchone()
     
     if not task:
-        return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+        return JSONResponse(status_code=404, content={'error': 'Task not found'})
     
     return task
 
@@ -76,6 +74,7 @@ def create_task(task: TaskCreate):
         with conn.cursor() as cursor:
             cursor.execute('INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING *;', (task.title.strip(), task.done))
             new_task = cursor.fetchone()
+        conn.commit()
 
     return new_task
 
@@ -88,26 +87,28 @@ class TaskUpdate(BaseModel):
 def update_task(task_id:int, task: TaskUpdate):
     """Updates a task's title and/or completion status."""
 
+    if task.title is None and task.done is None:
+        return JSONResponse(status_code=400, content={'error': 'At least one field (title or done) must be provided for update'})
+    
+    if task.title is not None and not task.title.strip():
+        return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
+
     with get_db_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute('SELECT * FROM tasks WHERE id = %s', (task_id,))
             current_task = cursor.fetchone()
         
             if not current_task:
-                return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+                return JSONResponse(status_code=404, content={'error': 'Task not found'})
 
-            if task.title is None and task.done is None:
-                return JSONResponse(status_code=400, content={'error': 'At least one field (title or done) must be provided for update'})
-    
-            if task.title is not None:
-                if not task.title.strip():
-                    return JSONResponse(status_code=400, content={'error': 'Task title cannot be empty'})
-                current_task['title'] = task.title.strip()
+            new_title = task.title.strip() if task.title is not None else current_task['title']
+            new_done = task.done if task.done is not None else current_task['done']
 
-            new_done = current_task['done'] if task.done is None else task.done
-    
-            cursor.execute('UPDATE tasks SET title = %s, done = %s WHERE id = %s RETURNING *', (current_task['title'], new_done, task_id))
+            cursor.execute('UPDATE tasks SET title = %s, done = %s WHERE id = %s RETURNING *', (new_title, new_done, task_id))
             updated_task = cursor.fetchone()
+
+        conn.commit()
+
     return updated_task
 
 
@@ -121,8 +122,9 @@ def delete_task(task_id:int):
             task = cursor.fetchone()
 
             if not task:
-                return JSONResponse(status_code=404, content={'error': f'Task {task_id} not found'})
+                return JSONResponse(status_code=404, content={'error': 'Task not found'})
 
             cursor.execute('DELETE FROM tasks WHERE id = %s', (task_id,))
+        conn.commit()
     
     return Response(status_code=status.HTTP_204_NO_CONTENT)
