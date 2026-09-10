@@ -1,148 +1,136 @@
 # Task Management CRUD API
 
-A lightweight, high-performance API for managing a to-do list, built with **FastAPI** and **Pydantic**. 
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi )
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white )
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white )
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white )
+
+A production-ready, containerized backend API for managing tasks, built with **FastAPI**, **PostgreSQL**, and **Docker Compose**.
 
 ---
 
-## What This Is
+## Overview & Transformations
 
-This project is a database-backed task management backend service created as part of the FlyRank Backend Internship (Week 2). It simulates a complete backend service for managing to-do items—allowing clients to create new tasks, view existing tasks, update task details, and delete tasks. 
+This project provides a robust task management RESTful API that handles full CRUD (Create, Read, Update, Delete) operations with strict input validation, automatic database initialization, and persistent storage.
 
-The primary goals of this project are to:
-- Practice handling standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`).
-- Implement proper input validation to ensure empty or malformed data is rejected.
-- Enforce standard HTTP status codes (`200`, `201`, `204`, `400`, `404`) to give clear feedback to clients[cite: 2].
-- Provide self-documenting interactive API testing via Swagger UI.
+### Project Architecture Evolution
+This application went through three major architectural transformations:
 
----
-
-## Database Architecture & Storage
-
-### Why PostgreSQL & Docker?
-* **Production-Grade Persistence:** Moves away from local file storage to a fully relational, scalable database system.
-* **Isolated Environment:** PostgreSQL runs inside a dedicated Docker container, ensuring identical database environments across development and production.
-* **Security First:** Database credentials (`DATABASE_URL`) are managed via environment variables and loaded through a `.env` file, keeping secrets completely isolated from source control.
-
-### Version Control & Secrets
-* **Git Ignored File:** `.env` is explicitly included in `.gitignore` to prevent sensitive database passwords and host parameters from leaking into Git history.
-* **Container Volume:** Persistent database storage is handled via Docker volumes (`taskdata`), keeping data intact across container restarts.
+1.  **Phase 1 (In-Memory Data):** Initial route prototyping using plain Python lists and dictionaries (data was ephemeral and cleared on restart).
+2.  **Phase 2 (SQLite File Database):** Introduced file-based SQLite database storage (`tasks.db`) to enable local persistence across server restarts.
+3.  **Phase 3 (Containerized PostgreSQL Stack):** Transformed into a full production setup featuring a dedicated **PostgreSQL** container with `SERIAL` auto-incrementing primary keys, volume persistence (`taskdata`), `.env` secrets isolation, and multi-container orchestration via `docker compose`.
 
 ---
 
-## How to Install & Run
+## Prerequisites
 
-### 1. Installation
-Clone the repository, set up a virtual environment, and install dependencies:
+Ensure you have the following installed locally before running the application:
 
-```bash
-# Clone the repository
-git clone [https://github.com/shathahsaleem/task-api.git](https://github.com/shathahsaleem/task-api.git)
-cd task-api
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/ ) (includes Docker Engine and `docker compose`)
+* [Git](https://git-scm.com/ )
+* *(Optional)* A database GUI client such as **TablePlus**, **DBeaver**, or **pgAdmin**
 
-# Create and activate a virtual environment
-python -m venv venv
+---
 
-# On Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# On macOS/Linux:
-source venv/bin/activate
+## Quick Start (One-Command Setup)
 
-# Install required dependencies
-pip install fastapi uvicorn pydantic
-```
-### 2. Activation
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/shathahsaleem/rest-api-task-management.git
+    cd rest-api-task-management
+    ```
 
-1. Start the PostgreSQL container:
-```bash
-docker run --name taskdb -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=tasks -p 5432:5432 -v taskdata:/var/lib/postgresql/data -d postgres:16
-```
+2.  **Set up Environment Variables:**
+    Copy the provided `.env.example` file to create your local `.env` configuration:
+    ```bash
+    cp .env.example .env
+    ```
 
-Run the server by starting the Uvicorn development server:
-```bash
-uvicorn main:app --reload
-```
-The API will be running live at http://localhost:8000. You can access the interactive Swagger UI documentation directly at http://localhost:8000/docs.
+3.  **Launch the Stack:**
+    Run the full application stack (FastAPI app + PostgreSQL database ) with a single command:
+    ```bash
+    docker compose up
+    ```
 
-## API Endpoints Overview
+The API will be live at `http://localhost:3000`.
+
+---
+
+## Environment Variables
+
+All environment configurations are kept out of source control via `.gitignore`. Refer to `.env.example` for local configuration:
+
+| Variable | Description | Default Value |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | PostgreSQL connection URI for FastAPI | `postgres://postgres:dev@db:5432/tasks` |
+| `POSTGRES_USER` | PostgreSQL superuser username | `postgres` |
+| `POSTGRES_PASSWORD` | PostgreSQL superuser password | `dev` |
+| `POSTGRES_DB` | Target database name | `tasks` |
+
+---
+
+## API Endpoints Matrix
+
+Detailed view of available REST API endpoints:
 
 | Method | Endpoint | Description | Request Body | Success Status | Error Statuses |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/` | API metadata and available endpoints | None | `200 OK` | N/A |
-| `GET` | `/health` | Health check endpoint | None | `200 OK` | N/A |
-| `GET` | `/tasks` | Retrieve all tasks from SQLite database | None | `200 OK` | N/A |
-| `GET` | `/tasks/{task_id}` | Retrieve a single task by ID from SQLite database | None | `200 OK` | `404 Not Found` |
-| `POST` | `/tasks` | Create a new task in SQLite database | `{"title": "Buy milk"}` | `201 Created` | `400 Bad Request`, `422 Unprocessable` |
-| `PUT` | `/tasks/{task_id}` | Update task title and/or completed status in SQLite database| `{"title": "Updated", "done": true}` | `200 OK` | `400 Bad Request`, `404 Not Found` |
-| `DELETE` | `/tasks/{task_id}` | Delete a task by ID from SQLite database | None | `204 No Content` | `404 Not Found` |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **GET** | `/tasks` | Retrieve all tasks | None | 200 OK | N/A |
+| **GET** | `/tasks/{task_id}` | Retrieve a single task by ID | None | 200 OK | 404 Not Found |
+| **POST** | `/tasks` | Create a new task | `{"title": "Buy milk"}` | 201 Created | 422 Unprocessable |
+| **PUT** | `/tasks/{task_id}` | Update task title and/or completed status | `{"title": "Updated", "done": true}` | 200 OK | 404 Not Found |
+| **DELETE** | `/tasks/{task_id}` | Delete a task by ID | None | 204 No Content | 404 Not Found |
 
-
-## Example SQL Query ##
-
-Below is the documented sequence of a task deletion operation executed on the SQLite database:
-
-### 1. Database State Before Deletion
-*Initial state showing task ID 5 in the table:*
-
-![Database before DELETE Query](db_before_delete.png)
+### Interactive API Documentation
+FastAPI automatically generates interactive OpenAPI documentation for your routes accessible directly in the browser while the container is running:
+- **Swagger UI:** `http://localhost:3000/docs`: Allows immediate, interactive endpoint execution directly from the browser without needing Postman.
+- **ReDoc:** `http://localhost:3000/redoc`: Provides clean, human-readable OpenAPI documentation for backend contracts and request schemas.
 
 ---
 
-### 2. Execution of Delete Operation
-*Running the SQL query to delete task ID 5:*
+## Sample `curl -i` Verification Output
 
-![DELETE Query Result](delete_query.png)
+Raw HTTP request and response output verifying task retrieval (`GET /tasks` ):
 
-Executing the delete query and receiving confirmation:
-```text
-Execution finished without errors.
-Result: query executed successfully. Took 2ms, 1 rows affected
-At line 1:
-DELETE FROM tasks WHERE id = 5
-```
-
----
-
-### 3. Database State After Deletion
-*Confirmation that task ID 5 was removed from the database:*
-
-![Database Post-Deletion of a row](db_after_delete.png)
-
-
-## Sample `curl -i` Execution Output
-
-Below is the raw HTTP response output from creating a new task using `curl -i`:
-```text
-HTTP/1.1 201 Created
-date: Sun, 09 Aug 2026 14:31:23 GMT
+```http
+HTTP/1.1 200 OK
+date: Wed, 09 Sep 2026 21:00:00 GMT
 server: uvicorn
-content-length: 57
+content-length: 184
 content-type: application/json
 
-{"id":4,"title":"Prepare team presentation","done":false}
+[
+  {"id":1,"title":"Buy groceries","done":true}, {"id":2,"title":"Clean the house","done":false}, {"id":3,"title":"Cook dinner","done":false}
+]
 ```
 
-## Interactive Documentation (Swagger UI)
-
-FastAPI automatically generates interactive documentation accessible directly in your browser at:
-**`http://localhost:8000/docs`**
-
 ---
 
-### Case 1: Read All Tasks (`GET /tasks`)
-Retrieves the initial list of pre-filled tasks from memory with a `200 OK` status.
+## Database Volume Persistence Proof (TablePlus GUI)
 
-![Swagger UI - GET Tasks](swagger-get-tasks.png)
+PostgreSQL data is mapped to a dedicated Docker named volume (`taskdata`). This guarantees complete data retention across container restarts.
 
----
+### 1. Start Stack & Create New Task
+Run `docker compose up`, then execute the POST /tasks endpoint to insert a new record into PostgreSQL:
+```bash
+docker compose up
 
-### Case 2: Create Task (`POST /tasks`)
-Sends a JSON request body `{"title": "Buy mango juice"}` to create a new task, returning a `201 Created` status and assigning a unique ID.
+curl -X POST http://localhost:3000/tasks -H "Content-Type: application/json" -d '{"title": "Deploy Docker Stack"}'
 
-![Swagger UI - POST Task](swagger-post-task.png)
+```
 
----
+TablePlus state showing newly created Task #4 in the database:
 
-### Case 3: Delete Task (`DELETE /tasks/{task_id}`)
-Deletes task #4 by ID, returning a `204 No Content` status confirming successful removal.
+![Database State Before Restart](imgs/before_restart.png)
 
-![Swagger UI - DELETE Task](swagger-delete-task.png)
+### 2. Stop Container Stack & Restart
+Execute `docker compose down` to destroy the active application and database containers, then spin the stack back up:
+```bash
+docker compose down
+docker compose up -d
+```
+
+### 3. Verify Persistent Data After Refresh
+After refreshing TablePlus, Task #4 `Deploy Docker Stack` remains intact in the database, confirming the named Docker volume retained all state across container destruction:
+
+![Database State After Restart](imgs/after_restart.png)
